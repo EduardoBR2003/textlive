@@ -1,0 +1,156 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { sessionApi } from '@/services/sessionApi';
+import { useSessionSocket } from './useSessionSocket';
+import { useDebounce } from './useDebounce';
+import { useDeviceToken } from './useDeviceToken';
+import { SessionPermission } from '@/types/session';
+import type { SessionState } from '@/types/session';
+
+interface UseSessionOptions {
+  slug: string;
+  ownerToken?: string;
+  password?: string;
+}
+
+export function useSession({ slug, ownerToken, password }: UseSessionOptions) {
+  const deviceId = useDeviceToken();
+  const [state, setState] = useState<SessionState>({
+    slug,
+    content: '',
+    permission: SessionPermission.EDIT,
+    hasPassword: false,
+    deviceCount: 0,
+    deviceLimit: 5,
+    isOwner: false,
+    ownerToken,
+    isLoading: true,
+    error: null,
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSynced, setIsSynced] = useState(false);
+  const [socketEnabled, setSocketEnabled] = useState(false);
+  const localContentRef = useRef<string>('');
+  const debouncedContent = useDebounce(state.content, 500);
+  const mountedRef = useRef(false);
+
+  const handleContentUpdated = useCallback((content: string) => {
+    localContentRef.current = content;
+    setState((prev) => ({ ...prev, content }));
+  }, []);
+
+  const handleDeviceCountChanged = useCallback((count: number) => {
+    setState((prev) => ({ ...prev, deviceCount: count }));
+  }, []);
+
+  const handleError = useCallback((message: string) => {
+    setState((prev) => ({ ...prev, error: message }));
+  }, []);
+
+  const handleSessionJoined = useCallback(
+    (data: {
+      content: string;
+      permission: SessionPermission;
+      deviceCount: number;
+      deviceLimit: number;
+      isOwner: boolean;
+    }) => {
+      if (!mountedRef.current) return;
+      localContentRef.current = data.content;
+      setState((prev) => ({
+        ...prev,
+        content: data.content,
+        permission: data.permission,
+        deviceCount: data.deviceCount,
+        deviceLimit: data.deviceLimit,
+        isOwner: data.isOwner || !!ownerToken,
+        error: null,
+      }));
+    },
+    [ownerToken],
+  );
+
+  const { updateContent } = useSessionSocket({
+    slug,
+    deviceId,
+    ownerToken,
+    password,
+    enabled: socketEnabled,
+    onContentUpdated: handleContentUpdated,
+    onDeviceCountChanged: handleDeviceCountChanged,
+    onContentSaved: () => {
+      setIsSaving(false);
+      setIsSynced(true);
+      setTimeout(() => setIsSynced(false), 3000);
+    },
+    onError: handleError,
+    onSessionJoined: handleSessionJoined,
+  });
+
+  const setContent = useCallback(
+    (content: string) => {
+      localContentRef.current = content;
+      setState((prev) => ({ ...prev, content }));
+      if (ownerToken) {
+        setIsSaving(true);
+        setIsSynced(false);
+      }
+    },
+    [ownerToken],
+  );
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const join = async () => {
+      try {
+        const result = await sessionApi.joinSession(slug, {
+          deviceId,
+          password,
+        });
+        if (!mountedRef.current) return;
+        setSocketEnabled(true);
+        localContentRef.current = result.content;
+        setState((prev) => ({
+          ...prev,
+          slug: result.slug,
+          content: result.content,
+          permission: result.permission,
+          deviceLimit: result.deviceLimit,
+          hasPassword: result.hasPassword,
+          deviceCount: result.deviceCount,
+          isLoading: false,
+          error: null,
+        }));
+      } catch (error) {
+        if (!mountedRef.current) return;
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error:
+            error instanceof Error ? error.message : 'Erro ao entrar na sessão',
+        }));
+      }
+    };
+
+    join();
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [slug, deviceId, password]);
+
+  useEffect(() => {
+    if (debouncedContent && ownerToken && socketEnabled) {
+      updateContent(debouncedContent);
+    }
+  }, [debouncedContent, ownerToken, updateContent]);
+
+  return {
+    ...state,
+    isSaving,
+    isSynced,
+    setContent,
+    setIsSynced,
+  };
+}
