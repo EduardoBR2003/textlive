@@ -15,7 +15,7 @@ export function SessionEditor({
   onChange,
 }: SessionEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const canEdit = isOwner && permission === SessionPermission.EDIT;
+  const canEdit = isOwner || permission === SessionPermission.EDIT;
 
   useEffect(() => {
     if (textareaRef.current && content !== textareaRef.current.value) {
