@@ -24,7 +24,7 @@ export class Session {
   @Column({ type: 'enum', enum: SessionPermission, default: SessionPermission.EDIT })
   permission: SessionPermission;
 
-  @Column({ type: 'int', default: 5 })
+  @Column({ type: 'int', default: 2 })
   deviceLimit: number;
 
   @Column({ type: 'uuid' })

@@ -4,7 +4,6 @@ import {
   Routes,
   Route,
   useParams,
-  Navigate,
 } from 'react-router-dom';
 import { HomePage } from '@/pages/HomePage';
 import { SessionPage } from '@/pages/SessionPage';
@@ -25,6 +24,13 @@ function SessionGuard() {
       setStatus('notFound');
       return;
     }
+
+    const sessionKey = `textlive_auth_${slug}`;
+    if (sessionStorage.getItem(sessionKey)) {
+      setStatus('exists');
+      return;
+    }
+
     try {
       const result = await sessionApi.verifySession(slug);
       if (!result.exists) {
@@ -32,6 +38,7 @@ function SessionGuard() {
       } else if (result.hasPassword) {
         setStatus('hasPassword');
       } else {
+        sessionStorage.setItem(sessionKey, 'true');
         setStatus('exists');
       }
     } catch {
@@ -45,8 +52,7 @@ function SessionGuard() {
 
   if (status === 'loading') return <LoadingState />;
   if (status === 'notFound') return <NotFoundOrExpiredPage />;
-  if (status === 'hasPassword')
-    return <ProtectedSessionPage />;
+  if (status === 'hasPassword') return <ProtectedSessionPage />;
   if (status === 'limitReached') return <SessionLimitPage />;
 
   return <SessionPage />;

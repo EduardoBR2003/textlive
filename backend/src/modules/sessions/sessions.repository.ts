@@ -36,7 +36,7 @@ export class SessionsRepository {
       content: '',
       password: data.password ?? null,
       permission: data.permission ?? SessionPermission.EDIT,
-      deviceLimit: data.deviceLimit ?? 5,
+      deviceLimit: data.deviceLimit ?? 2,
       ownerToken: uuidv4(),
       devices: [],
       expiresAt: new Date(now.getTime() + expiresInHours * 60 * 60 * 1000),

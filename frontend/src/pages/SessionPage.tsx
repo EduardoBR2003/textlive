@@ -1,15 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/hooks/useSession';
 import { useSessionPermissions } from '@/hooks/useSessionPermissions';
 import { useDeviceToken } from '@/hooks/useDeviceToken';
 import { sessionApi } from '@/services/sessionApi';
-import { formatSessionUrl } from '@/utils/formatSessionUrl';
 import { Header } from '@/components/Header';
 import { SessionEditor } from '@/components/SessionEditor';
-import { CopyLinkButton } from '@/components/CopyLinkButton';
-import { CopyTextButton } from '@/components/CopyTextButton';
-import { QRCodeCard } from '@/components/QRCodeCard';
 import { OwnerControls } from '@/components/OwnerControls';
 import { LoadingState } from '@/components/LoadingState';
 import { SessionPermission } from '@/types/session';
@@ -26,10 +22,8 @@ export function SessionPage() {
       localStorage.getItem(`textlive_owner_${slug}`) ||
       undefined,
   );
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'link' | 'permissions' | 'actions' | 'security'>('link');
-
-  const sessionUrl = slug ? formatSessionUrl(slug) : '';
+  const [hasPassword, setHasPassword] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'link' | 'permissions'>('link');
 
   const session = useSession({
     slug: slug || '',
@@ -81,13 +75,18 @@ export function SessionPage() {
     [updateDeviceLimit],
   );
 
+  const handlePasswordChanged = useCallback(
+    (newHasPassword: boolean) => {
+      setHasPassword(newHasPassword);
+    },
+    [],
+  );
+
   if (session.isLoading) {
     return <LoadingState />;
   }
 
   const isOwner = !!ownerToken;
-
-  const sessionUrlDisplay = `textlive.com/${slug}`;
 
   return (
     <div className="bg-background text-on-background font-body-md h-screen overflow-hidden flex flex-col">
@@ -107,9 +106,10 @@ export function SessionPage() {
               permission={permission}
               deviceLimit={deviceLimit}
               deviceCount={session.deviceCount}
-              hasPassword={session.hasPassword}
+              hasPassword={hasPassword || session.hasPassword}
               onPermissionChange={handlePermissionChange}
               onDeviceLimitChange={handleDeviceLimitChange}
+              onPasswordChanged={handlePasswordChanged}
               onDeleteSession={handleDeleteSession}
             />
           </div>
@@ -121,10 +121,22 @@ export function SessionPage() {
               <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
                 Sessão Ativa
               </p>
-              <CopyTextButton text={sessionUrlDisplay} />
-              <CopyLinkButton url={sessionUrl} />
+              <div className="bg-surface-container rounded-lg border border-outline-variant p-4 text-center">
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  {session.permission === SessionPermission.EDIT
+                    ? 'Você pode editar o texto'
+                    : 'Somente visualização'}
+                </p>
+              </div>
             </div>
-            <QRCodeCard url={sessionUrl} className="mt-lg" />
+            <div className="rounded-lg border border-outline-variant p-4 space-y-2">
+              <div className="flex items-center gap-2 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[18px]">devices</span>
+                <span className="font-label-sm text-label-sm">
+                  {session.deviceCount} de {session.deviceLimit} dispositivos
+                </span>
+              </div>
+            </div>
             <div className="mt-auto">
               <button
                 onClick={() => navigate('/')}
@@ -149,19 +161,12 @@ export function SessionPage() {
           onClick={() => setMobileTab('link')}
           className={`flex flex-col items-center justify-center px-4 py-1 rounded-xl transition-all ${mobileTab === 'link' ? 'bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary scale-90' : 'text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-inverse-surface'}`}
         >
-          <span className="material-symbols-outlined">share</span>
-          <span className="font-label-sm text-label-sm mt-1">Link</span>
+          <span className="material-symbols-outlined">devices</span>
+          <span className="font-label-sm text-label-sm mt-1">Info</span>
         </button>
         <button
           onClick={() => setMobileTab('permissions')}
           className={`flex flex-col items-center justify-center px-4 py-1 rounded-xl transition-all ${mobileTab === 'permissions' ? 'bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary scale-90' : 'text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-inverse-surface'}`}
-        >
-          <span className="material-symbols-outlined">lock</span>
-          <span className="font-label-sm text-label-sm mt-1">Permissões</span>
-        </button>
-        <button
-          onClick={() => setMobileTab('actions')}
-          className={`flex flex-col items-center justify-center px-4 py-1 rounded-xl transition-all ${mobileTab === 'actions' ? 'bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary scale-90' : 'text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-inverse-surface'}`}
         >
           <span className="material-symbols-outlined">settings</span>
           <span className="font-label-sm text-label-sm mt-1">Ações</span>
@@ -179,16 +184,27 @@ export function SessionPage() {
 
       {mobileTab === 'link' && (
         <div className="md:hidden fixed bottom-16 left-0 w-full bg-surface border-t border-outline-variant p-md z-50">
-          <CopyTextButton text={sessionUrlDisplay} />
-          <CopyLinkButton url={sessionUrl} className="mt-sm" />
+          <div className="flex items-center justify-between text-on-surface-variant font-label-md text-label-md">
+            <span className="material-symbols-outlined text-[20px]">devices</span>
+            <span>{session.deviceCount} de {session.deviceLimit} dispositivos</span>
+          </div>
+          <p className="font-body-sm text-body-sm text-on-surface-variant mt-sm">
+            {session.permission === SessionPermission.EDIT
+              ? 'Permissão: Editar'
+              : 'Permissão: Somente visualizar'}
+          </p>
         </div>
       )}
 
       {mobileTab === 'permissions' && (
         <div className="md:hidden fixed bottom-16 left-0 w-full bg-surface border-t border-outline-variant p-md z-50">
-          <div className="flex items-center justify-between text-on-surface-variant font-label-md text-label-md mb-sm">
-            <span className="material-symbols-outlined text-[20px]">devices</span>
-            {session.deviceCount} dispositivos conectados
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => navigate('/')}
+              className="w-full py-3 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md hover:bg-secondary-fixed-dim transition-colors"
+            >
+              Sair da sessão
+            </button>
           </div>
         </div>
       )}

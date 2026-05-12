@@ -20,7 +20,7 @@ export function useSession({ slug, ownerToken, password }: UseSessionOptions) {
     permission: SessionPermission.EDIT,
     hasPassword: false,
     deviceCount: 0,
-    deviceLimit: 5,
+    deviceLimit: 2,
     isOwner: false,
     ownerToken,
     isLoading: true,

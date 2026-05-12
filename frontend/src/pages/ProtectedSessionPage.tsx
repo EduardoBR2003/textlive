@@ -28,6 +28,7 @@ export function ProtectedSessionPage() {
       try {
         const deviceId = generateLocalDeviceId();
         await sessionApi.joinSession(slug, { deviceId, password });
+        sessionStorage.setItem(`textlive_auth_${slug}`, 'true');
         navigate(`/s/${slug}`, { replace: true });
       } catch (err) {
         setError(

@@ -14,7 +14,7 @@ export function HomePage() {
     try {
       const result = await sessionApi.createSession({
         permission: SessionPermission.EDIT,
-        deviceLimit: 5,
+        deviceLimit: 2,
       });
       localStorage.setItem(`textlive_owner_${result.slug}`, result.ownerToken);
       navigate(`/s/${result.slug}`, {

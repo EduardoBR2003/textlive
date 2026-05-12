@@ -2,7 +2,11 @@ import React, { useState, useCallback } from 'react';
 import { sessionApi } from '@/services/sessionApi';
 import { PermissionsPanel } from './PermissionsPanel';
 import { PasswordModal } from './PasswordModal';
+import { QRCodeCard } from './QRCodeCard';
+import { CopyLinkButton } from './CopyLinkButton';
+import { CopyTextButton } from './CopyTextButton';
 import { SessionPermission } from '@/types/session';
+import { formatSessionUrl } from '@/utils/formatSessionUrl';
 
 interface OwnerControlsProps {
   slug: string;
@@ -13,6 +17,7 @@ interface OwnerControlsProps {
   hasPassword: boolean;
   onPermissionChange: (permission: SessionPermission) => void;
   onDeviceLimitChange: (limit: number) => void;
+  onPasswordChanged: (hasPassword: boolean) => void;
   onDeleteSession: () => void;
   className?: string;
 }
@@ -26,17 +31,22 @@ export function OwnerControls({
   hasPassword,
   onPermissionChange,
   onDeviceLimitChange,
+  onPasswordChanged,
   onDeleteSession,
   className,
 }: OwnerControlsProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'qr' | 'permissions' | 'security'>('qr');
 
+  const sessionUrl = formatSessionUrl(slug);
+  const sessionUrlDisplay = `textlive.com/${slug}`;
+
   const handlePasswordSave = useCallback(
     async (password: string | null) => {
       await sessionApi.updatePassword(slug, { password, ownerToken });
+      onPasswordChanged(!!password);
     },
-    [slug, ownerToken],
+    [slug, ownerToken, onPasswordChanged],
   );
 
   const handleClearContent = useCallback(async () => {
@@ -47,6 +57,14 @@ export function OwnerControls({
     <aside
       className={`flex flex-col h-full w-72 rounded-r-xl border-r border-outline-variant dark:border-outline shadow-sm bg-surface-container-low dark:bg-on-surface p-md space-y-lg flex-shrink-0 z-40 ${className || ''}`}
     >
+      <div className="space-y-sm">
+        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+          Sua Sessão
+        </p>
+        <CopyTextButton text={sessionUrlDisplay} />
+        <CopyLinkButton url={sessionUrl} />
+      </div>
+
       <nav className="flex-1 space-y-2">
         <a
           className={`flex items-center gap-3 pl-4 py-3 rounded-r-lg transition-all cursor-pointer ${
@@ -59,6 +77,12 @@ export function OwnerControls({
           <span className="material-symbols-outlined">qr_code_2</span>
           <span className="font-label-md text-label-md">QR Code</span>
         </a>
+
+        {activeTab === 'qr' && (
+          <div className="pl-4 pr-4 pb-2">
+            <QRCodeCard url={sessionUrl} />
+          </div>
+        )}
 
         <a
           className={`flex items-center gap-3 pl-4 py-3 rounded-r-lg transition-all cursor-pointer ${
