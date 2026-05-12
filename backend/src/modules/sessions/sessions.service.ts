@@ -54,7 +54,7 @@ export class SessionsService {
     return { exists: true, hasPassword: !!session.password };
   }
 
-  async joinSession(slug: string, dto: JoinSessionDto & { ownerToken?: string }): Promise<Session> {
+  async joinSession(slug: string, dto: JoinSessionDto): Promise<Session> {
     const session = await this.sessionsRepository.findBySlug(slug);
     if (!session) {
       throw new NotFoundException('Sessão não encontrada');
@@ -66,25 +66,21 @@ export class SessionsService {
       throw new ForbiddenException('Senha incorreta');
     }
 
-    const isOwner = dto.ownerToken && session.ownerToken === dto.ownerToken;
-    if (isOwner) {
-      return session;
+    const deviceCount = this.sessionsRepository.getDeviceCount(session);
+    if (deviceCount >= session.deviceLimit) {
+      const existingDevice = session.devices.find(
+        (d) => d.deviceId === dto.deviceId,
+      );
+      if (!existingDevice) {
+        throw new ConflictException('Limite de dispositivos atingido');
+      }
     }
 
-    const result = await this.sessionsRepository.addDevice(
-      session.id,
-      dto.deviceId,
-      session.deviceLimit,
-    );
-
-    if (result.blocked) {
-      throw new ConflictException('Limite de dispositivos atingido');
-    }
-
-    return result.session!;
+    await this.sessionsRepository.addDevice(session.id, dto.deviceId);
+    return (await this.sessionsRepository.findById(session.id))!;
   }
 
-  async updateContent(slug: string, dto: UpdateContentDto & { deviceId?: string }): Promise<Session> {
+  async updateContent(slug: string, dto: UpdateContentDto): Promise<Session> {
     const session = await this.sessionsRepository.findBySlug(slug);
     if (!session) {
       throw new NotFoundException('Sessão não encontrada');
@@ -92,17 +88,12 @@ export class SessionsService {
 
     await this.validateSessionNotExpired(session);
 
-    const isOwner = dto.ownerToken && session.ownerToken === dto.ownerToken;
-    const isGuest = dto.deviceId && session.devices.some((d) => d.deviceId === dto.deviceId);
+    if (session.ownerToken !== dto.ownerToken) {
+      throw new ForbiddenException('Apenas o dono pode alterar o conteúdo');
+    }
 
-    if (isOwner) {
-      // Dono sempre pode editar
-    } else if (isGuest && session.permission === SessionPermission.EDIT) {
-      // Guest pode editar se permissão for EDIT
-    } else if (isGuest && session.permission !== SessionPermission.EDIT) {
+    if (session.permission !== SessionPermission.EDIT) {
       throw new ForbiddenException('Permissão de edição desabilitada');
-    } else {
-      throw new ForbiddenException('Sem permissão para editar');
     }
 
     const updated = await this.sessionsRepository.updateContent(session.id, dto.content);

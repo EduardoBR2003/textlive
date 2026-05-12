@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { SessionPermission } from '@/types/session';
 import { sessionApi } from '@/services/sessionApi';
 
@@ -19,17 +19,8 @@ export function useSessionPermissions({
   const [deviceLimit, setDeviceLimit] = useState<number>(initialDeviceLimit);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
-    setPermission(initialPermission);
-  }, [initialPermission]);
-
-  useEffect(() => {
-    setDeviceLimit(initialDeviceLimit);
-  }, [initialDeviceLimit]);
-
   const updatePermission = useCallback(
     async (newPermission: SessionPermission) => {
-      if (!ownerToken) return;
       setIsUpdating(true);
       try {
         await sessionApi.updatePermissions(slug, {
@@ -48,7 +39,7 @@ export function useSessionPermissions({
 
   const updateDeviceLimit = useCallback(
     async (newLimit: number) => {
-      if (!ownerToken || newLimit < 1 || newLimit > 20) return;
+      if (newLimit < 1 || newLimit > 20) return;
       setIsUpdating(true);
       try {
         await sessionApi.updatePermissions(slug, {

@@ -83,37 +83,18 @@ export class SessionsRepository {
     return this.findById(id);
   }
 
-  async addDevice(sessionId: string, deviceId: string, limit: number): Promise<{
-    session: Session | null;
-    blocked: boolean;
-  }> {
-    const existing = await this.repo.findOne({
-      where: { id: sessionId },
-      select: ['devices'],
-    });
-    if (!existing) return { session: null, blocked: false };
-
-    if (existing.devices.some((d) => d.deviceId === deviceId)) {
-      const session = await this.findById(sessionId);
-      return { session, blocked: false };
-    }
-
-    const newDevice = JSON.stringify([{ deviceId, joinedAt: new Date().toISOString() }]);
-    const result = await this.repo.query(
-      `UPDATE sessions
-       SET devices = devices::jsonb || $1::jsonb
-       WHERE id = $2 AND jsonb_array_length(devices::jsonb) < $3
-       RETURNING id`,
-      [newDevice, sessionId, limit],
-    );
-
-    const affected = result[1] as number;
-    if (affected === 0) {
-      return { session: null, blocked: true };
-    }
-
+  async addDevice(sessionId: string, deviceId: string): Promise<Session | null> {
     const session = await this.findById(sessionId);
-    return { session, blocked: false };
+    if (!session) return null;
+
+    const existingIndex = session.devices.findIndex(
+      (d) => d.deviceId === deviceId,
+    );
+    if (existingIndex >= 0) return session;
+
+    session.devices.push({ deviceId, joinedAt: new Date().toISOString() });
+    await this.repo.update(sessionId, { devices: session.devices });
+    return this.findById(sessionId);
   }
 
   async removeDevice(sessionId: string, deviceId: string): Promise<Session | null> {

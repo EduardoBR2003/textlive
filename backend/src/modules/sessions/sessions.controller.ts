@@ -10,21 +10,16 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
-import { SessionsGateway } from './sessions.gateway';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { JoinSessionDto } from './dto/join-session.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdatePermissionsDto } from './dto/update-permissions.dto';
-import { LeaveSessionDto } from './dto/leave-session.dto';
 import { OwnerActionDto } from './dto/owner-action.dto';
 
 @Controller('sessions')
 export class SessionsController {
-  constructor(
-    private readonly sessionsService: SessionsService,
-    private readonly gateway: SessionsGateway,
-  ) {}
+  constructor(private readonly sessionsService: SessionsService) {}
 
   @Post()
   async createSession(@Body() dto: CreateSessionDto) {
@@ -62,11 +57,7 @@ export class SessionsController {
   @Post(':slug/join')
   @HttpCode(HttpStatus.OK)
   async joinSession(@Param('slug') slug: string, @Body() dto: JoinSessionDto) {
-    const session = await this.sessionsService.joinSession(slug, {
-      deviceId: dto.deviceId,
-      password: dto.password,
-      ownerToken: dto.ownerToken,
-    });
+    const session = await this.sessionsService.joinSession(slug, dto);
     return {
       slug: session.slug,
       content: session.content,
@@ -97,7 +88,6 @@ export class SessionsController {
     @Body() dto: UpdatePermissionsDto,
   ) {
     const session = await this.sessionsService.updatePermissions(slug, dto);
-    this.gateway.broadcastPermissions(slug, session.permission, session.deviceLimit);
     return {
       slug: session.slug,
       permission: session.permission,
@@ -139,25 +129,5 @@ export class SessionsController {
   async getDeviceCount(@Param('slug') slug: string) {
     const count = await this.sessionsService.getDeviceCount(slug);
     return { count };
-  }
-
-  @Post(':slug/leave')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async leaveSession(
-    @Param('slug') slug: string,
-    @Body() dto: LeaveSessionDto,
-  ) {
-    const session = await this.sessionsService.leaveSession(slug, dto.deviceId);
-    this.gateway.broadcastDeviceCount(slug, session.devices.length);
-  }
-
-  @Post(':slug/end')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async endSession(
-    @Param('slug') slug: string,
-    @Body() dto: OwnerActionDto,
-  ) {
-    await this.sessionsService.deleteSession(slug, dto.ownerToken);
-    this.gateway.broadcastSessionEnded(slug);
   }
 }

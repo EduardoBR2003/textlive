@@ -54,7 +54,7 @@ export const sessionApi = {
 
   joinSession(
     slug: string,
-    data: { deviceId: string; password?: string; ownerToken?: string },
+    data: { deviceId: string; password?: string },
   ): Promise<JoinSessionResponse> {
     return request<JoinSessionResponse>(
       `${API_BASE}/${encodeURIComponent(slug)}/join`,
@@ -125,26 +125,6 @@ export const sessionApi = {
   getDeviceCount(slug: string): Promise<{ count: number }> {
     return request<{ count: number }>(
       `${API_BASE}/${encodeURIComponent(slug)}/devices`,
-    );
-  },
-
-  endSession(slug: string, ownerToken: string): void {
-    const blob = new Blob([JSON.stringify({ ownerToken })], {
-      type: 'application/json',
-    });
-    navigator.sendBeacon(
-      `${API_BASE}/${encodeURIComponent(slug)}/end`,
-      blob,
-    );
-  },
-
-  leaveSession(slug: string, deviceId: string): void {
-    const blob = new Blob([JSON.stringify({ deviceId })], {
-      type: 'application/json',
-    });
-    navigator.sendBeacon(
-      `${API_BASE}/${encodeURIComponent(slug)}/leave`,
-      blob,
     );
   },
 };

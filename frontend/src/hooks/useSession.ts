@@ -44,16 +44,8 @@ export function useSession({ slug, ownerToken, password }: UseSessionOptions) {
   }, []);
 
   const handleError = useCallback((message: string) => {
-    if (message.includes('Permissão')) return;
     setState((prev) => ({ ...prev, error: message }));
   }, []);
-
-  const handlePermissionsChanged = useCallback(
-    (newPermission: SessionPermission, newDeviceLimit: number) => {
-      setState((prev) => ({ ...prev, permission: newPermission, deviceLimit: newDeviceLimit }));
-    },
-    [],
-  );
 
   const handleSessionJoined = useCallback(
     (data: {
@@ -92,10 +84,6 @@ export function useSession({ slug, ownerToken, password }: UseSessionOptions) {
       setTimeout(() => setIsSynced(false), 3000);
     },
     onError: handleError,
-    onPermissionsChanged: handlePermissionsChanged,
-    onSessionEnded: () => {
-      setState((prev) => ({ ...prev, error: 'Sessão encerrada pelo dono' }));
-    },
     onSessionJoined: handleSessionJoined,
   });
 
@@ -103,10 +91,12 @@ export function useSession({ slug, ownerToken, password }: UseSessionOptions) {
     (content: string) => {
       localContentRef.current = content;
       setState((prev) => ({ ...prev, content }));
-      setIsSaving(true);
-      setIsSynced(false);
+      if (ownerToken) {
+        setIsSaving(true);
+        setIsSynced(false);
+      }
     },
-    [],
+    [ownerToken],
   );
 
   useEffect(() => {
@@ -117,7 +107,6 @@ export function useSession({ slug, ownerToken, password }: UseSessionOptions) {
         const result = await sessionApi.joinSession(slug, {
           deviceId,
           password,
-          ownerToken,
         });
         if (!mountedRef.current) return;
         setSocketEnabled(true);
@@ -146,38 +135,16 @@ export function useSession({ slug, ownerToken, password }: UseSessionOptions) {
 
     join();
 
-    const handleBeforeUnload = () => {
-      if (ownerToken) {
-        sessionApi.endSession(slug, ownerToken);
-      } else {
-        sessionApi.leaveSession(slug, deviceId);
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        if (ownerToken) {
-          sessionApi.endSession(slug, ownerToken);
-        } else {
-          sessionApi.leaveSession(slug, deviceId);
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
     return () => {
       mountedRef.current = false;
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [slug, deviceId, password]);
 
   useEffect(() => {
-    if (debouncedContent && socketEnabled) {
+    if (debouncedContent && ownerToken && socketEnabled) {
       updateContent(debouncedContent);
     }
-  }, [debouncedContent, socketEnabled, updateContent]);
+  }, [debouncedContent, ownerToken, updateContent]);
 
   return {
     ...state,

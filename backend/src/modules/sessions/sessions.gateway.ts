@@ -21,8 +21,7 @@ interface JoinSessionPayload {
 interface UpdateContentPayload {
   slug: string;
   content: string;
-  ownerToken?: string;
-  deviceId?: string;
+  ownerToken: string;
 }
 
 interface LeaveSessionPayload {
@@ -43,58 +42,24 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
   server: Server;
 
   private clientToSessions: Map<string, Set<string>> = new Map();
-  private clientToDevice: Map<string, { deviceId: string; slug: string; isOwner: boolean; ownerToken?: string }> = new Map();
 
   constructor(private readonly sessionsService: SessionsService) {}
-
-  broadcastPermissions(slug: string, permission: string, deviceLimit: number): void {
-    this.server.to(slug).emit('permissions-changed', {
-      slug,
-      permission,
-      deviceLimit,
-    });
-  }
-
-  broadcastDeviceCount(slug: string, count: number): void {
-    this.server.to(slug).emit('device-count-changed', { slug, count });
-  }
-
-  broadcastSessionEnded(slug: string): void {
-    this.server.to(slug).emit('session-ended', { slug });
-    this.server.in(slug).socketsLeave(slug);
-  }
 
   handleConnection(client: Socket): void {
     this.clientToSessions.set(client.id, new Set());
   }
 
   handleDisconnect(client: Socket): void {
-    const info = this.clientToDevice.get(client.id);
-    if (info) {
-      if (info.isOwner && info.ownerToken) {
-        this.sessionsService.deleteSession(info.slug, info.ownerToken).then(() => {
-          this.server.to(info.slug).emit('session-ended', { slug: info.slug });
-          this.server.in(info.slug).socketsLeave(info.slug);
-        }).catch(() => {});
-      } else {
-        this.sessionsService.leaveSession(info.slug, info.deviceId).then((session) => {
-          this.server.to(info.slug).emit('device-count-changed', {
-            slug: info.slug,
-            count: session.devices.length,
-          });
-        }).catch(() => {});
-      }
-    }
-
     const sessions = this.clientToSessions.get(client.id);
     if (sessions) {
       for (const slug of sessions) {
-        this.server.to(slug).emit('participant-disconnected', { slug, socketId: client.id });
+        this.server.to(slug).emit('participant-disconnected', {
+          slug,
+          socketId: client.id,
+        });
       }
     }
-
     this.clientToSessions.delete(client.id);
-    this.clientToDevice.delete(client.id);
   }
 
   @SubscribeMessage('join-session')
@@ -106,7 +71,6 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
       const session = await this.sessionsService.joinSession(payload.slug, {
         deviceId: payload.deviceId,
         password: payload.password,
-        ownerToken: payload.ownerToken,
       });
 
       client.join(payload.slug);
@@ -119,13 +83,6 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
       const isOwner = payload.ownerToken
         ? session.ownerToken === payload.ownerToken
         : false;
-
-      this.clientToDevice.set(client.id, {
-        deviceId: payload.deviceId,
-        slug: payload.slug,
-        isOwner,
-        ownerToken: payload.ownerToken,
-      });
 
       client.emit('session-joined', {
         slug: session.slug,
@@ -162,7 +119,6 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
       );
 
       client.leave(payload.slug);
-      this.clientToDevice.delete(client.id);
       const sessions = this.clientToSessions.get(client.id);
       if (sessions) {
         sessions.delete(payload.slug);
@@ -190,7 +146,6 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
       const session = await this.sessionsService.updateContent(payload.slug, {
         content: payload.content,
         ownerToken: payload.ownerToken,
-        deviceId: payload.deviceId,
       });
 
       client.broadcast

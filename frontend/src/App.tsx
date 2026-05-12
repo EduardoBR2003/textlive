@@ -25,18 +25,20 @@ function SessionGuard() {
       return;
     }
 
+    const sessionKey = `textlive_auth_${slug}`;
+    if (sessionStorage.getItem(sessionKey)) {
+      setStatus('exists');
+      return;
+    }
+
     try {
       const result = await sessionApi.verifySession(slug);
       if (!result.exists) {
-        sessionStorage.removeItem(`textlive_auth_${slug}`);
         setStatus('notFound');
       } else if (result.hasPassword) {
-        if (sessionStorage.getItem(`textlive_auth_${slug}`)) {
-          setStatus('exists');
-        } else {
-          setStatus('hasPassword');
-        }
+        setStatus('hasPassword');
       } else {
+        sessionStorage.setItem(sessionKey, 'true');
         setStatus('exists');
       }
     } catch {
