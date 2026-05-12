@@ -1,6 +1,18 @@
-# TextLive
+<div align="center">
+  <h1>TextLive</h1>
+  <p>Editor de texto colaborativo em tempo real — simples, rápido e seguro.</p>
 
-Editor de texto colaborativo em tempo real. Simples, rápido e seguro.
+  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socket.io&logoColor=white" alt="Socket.IO" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/Tailwind-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+</div>
+
+---
 
 ## Funcionalidades
 
@@ -8,19 +20,14 @@ Editor de texto colaborativo em tempo real. Simples, rápido e seguro.
 - Edição colaborativa em tempo real via WebSocket
 - Proteção por senha
 - Controle de permissões (visualização ou edição)
-- Limite de dispositivos conectados
+- Limite de dispositivos conectados com validação atômica
 - QR Code para compartilhamento rápido
 - Tema claro/escuro
 - Responsivo (desktop e mobile)
+- Saída automática ao fechar a aba
+- Sessão encerrada quando o dono desconecta
 
-## Stack
-
-| Camada | Tecnologia |
-|--------|-----------|
-| Frontend | React, TypeScript, Vite, Tailwind CSS |
-| Backend | NestJS, TypeScript, Socket.IO |
-| Banco | PostgreSQL + TypeORM |
-| Infra | Docker, Docker Compose |
+---
 
 ## Arquitetura
 
@@ -53,46 +60,48 @@ frontend/src/
 
 ### Separação de responsabilidades
 
-- **Controller** → recebe HTTP, valida DTOs, delega ao Service
-- **Service** → regras de negócio (valida dono, senha, limite, permissões)
-- **Gateway** → WebSocket (salas, eventos em tempo real), nunca acessa banco direto
-- **Repository** → acesso ao banco via TypeORM
-- **Pages** → composição de componentes, roteamento
-- **Components** → visuais puros, sem regra de negócio
-- **Hooks** → lógica reutilizável (socket, clipboard, debounce)
+| Camada | Responsabilidade |
+|--------|-----------------|
+| **Controller** | Recebe HTTP, valida DTOs, delega ao Service |
+| **Service** | Regras de negócio (dono, senha, limite, permissões) |
+| **Gateway** | WebSocket — salas e eventos em tempo real |
+| **Repository** | Acesso ao banco via TypeORM |
+| **Pages** | Composição de componentes e roteamento |
+| **Components** | Visuais puros, sem regra de negócio |
+| **Hooks** | Lógica reutilizável (socket, clipboard, debounce) |
 
-## Requisitos
+---
 
-- Docker e Docker Compose
-- Ou Node.js 20+ e PostgreSQL 16+
+## Executando
 
-## Executando com Docker
+### Docker (recomendado)
 
 ```bash
-# Subir todos os serviços (PostgreSQL, Backend, Frontend)
 docker compose up -d
-
-# Acessar
-# Frontend: http://localhost:5173
-# Backend: http://localhost:3001
-# PostgreSQL: localhost:5433
-
-# Parar
-docker compose down
 ```
 
-## Executando sem Docker
+| Serviço | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:3001 |
+| PostgreSQL | `localhost:5433` |
 
-### Backend
+```bash
+docker compose down   # parar tudo
+```
+
+### Manual
+
+**Backend**
 
 ```bash
 cd backend
-cp .env.example .env    # Ajuste as variáveis conforme necessário
+cp .env.example .env
 npm install
 npm run start:dev       # http://localhost:3001
 ```
 
-### Frontend
+**Frontend**
 
 ```bash
 cd frontend
@@ -100,55 +109,58 @@ npm install
 npm run dev             # http://localhost:5173
 ```
 
-### PostgreSQL
+É necessário um PostgreSQL rodando. Configure a conexão em `backend/.env`.
 
-É necessário um banco PostgreSQL rodando. Configure a conexão no arquivo `backend/.env`.
+---
 
-## Endpoints da API
+## API
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `POST` | `/api/sessions` | Criar nova sessão |
 | `GET` | `/api/sessions/:slug/verify` | Verificar se sessão existe |
 | `GET` | `/api/sessions/:slug` | Obter dados da sessão |
-| `POST` | `/api/sessions/:slug/join` | Entrar em uma sessão |
-| `PATCH` | `/api/sessions/:slug/content` | Atualizar conteúdo (dono) |
+| `POST` | `/api/sessions/:slug/join` | Entrar na sessão |
+| `POST` | `/api/sessions/:slug/leave` | Sair da sessão |
+| `POST` | `/api/sessions/:slug/end` | Encerrar sessão (dono) |
+| `PATCH` | `/api/sessions/:slug/content` | Atualizar conteúdo |
 | `PATCH` | `/api/sessions/:slug/permissions` | Atualizar permissões (dono) |
 | `PATCH` | `/api/sessions/:slug/password` | Atualizar senha (dono) |
-| `POST` | `/api/sessions/:slug/owner/verify` | Verificar token de dono |
 | `DELETE` | `/api/sessions/:slug` | Excluir sessão (dono) |
 | `GET` | `/api/sessions/:slug/devices` | Quantidade de dispositivos |
 
-## Eventos WebSocket
+## WebSocket — `/sessions`
 
-Namespace: `/sessions`
+### Cliente → Servidor
 
-**Cliente → Servidor:**
 | Evento | Payload |
 |--------|---------|
-| `join-session` | `{ slug, deviceId, password?, ownerToken? }` |
-| `leave-session` | `{ slug, deviceId }` |
-| `update-content` | `{ slug, content, ownerToken }` |
-| `request-session-state` | `{ slug }` |
+| `join-session` | `slug, deviceId, password?, ownerToken?` |
+| `leave-session` | `slug, deviceId` |
+| `update-content` | `slug, content, ownerToken?, deviceId?` |
 
-**Servidor → Cliente:**
-| Evento | Payload |
-|--------|---------|
-| `session-joined` | `{ slug, content, permission, hasPassword, deviceCount, deviceLimit, isOwner }` |
-| `content-updated` | `{ slug, content, updatedAt }` |
-| `content-saved` | `{ slug, updatedAt }` |
-| `device-count-changed` | `{ slug, count }` |
-| `session-state` | `{ slug, content, permission, hasPassword, deviceCount, deviceLimit }` |
+### Servidor → Cliente
+
+| Evento | Descrição |
+|--------|-----------|
+| `session-joined` | Dados iniciais da sessão |
+| `content-updated` | Texto atualizado por outro participante |
+| `content-saved` | Confirmação de salvamento |
+| `device-count-changed` | Mudança no número de dispositivos |
+| `permissions-changed` | Permissão/limite alterados pelo dono |
+| `session-ended` | Sessão encerrada pelo dono |
+
+---
 
 ## Variáveis de ambiente
 
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
-| `PORT` | `3001` | Porta do servidor backend |
-| `CORS_ORIGIN` | `*` | Origem permitida para CORS |
+| `PORT` | `3001` | Porta do backend |
 | `DB_HOST` | `localhost` | Host do PostgreSQL |
 | `DB_PORT` | `5432` | Porta do PostgreSQL |
 | `DB_USERNAME` | `textlive` | Usuário do banco |
 | `DB_PASSWORD` | `textlive` | Senha do banco |
 | `DB_DATABASE` | `textlive` | Nome do banco |
-| `DB_SYNCHRONIZE` | `true` | Sincronizar schema automaticamente |
+| `DB_SYNCHRONIZE` | `true` | Sincronizar schema |
+| `CORS_ORIGIN` | `*` | Origem CORS |
