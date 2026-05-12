@@ -10,8 +10,10 @@ interface UseSessionSocketOptions {
   enabled: boolean;
   onContentUpdated: (content: string) => void;
   onDeviceCountChanged: (count: number) => void;
+  onPermissionsChanged?: (permission: SessionPermission, deviceLimit: number) => void;
   onContentSaved?: () => void;
   onError: (message: string) => void;
+  onSessionEnded?: () => void;
   onSessionJoined?: (data: {
     content: string;
     permission: SessionPermission;
@@ -28,21 +30,22 @@ export function useSessionSocket({
   password,
   enabled,
   onContentUpdated,
-  onDeviceCountChanged,
-  onContentSaved,
-  onError,
-  onSessionJoined,
+    onDeviceCountChanged,
+    onPermissionsChanged,
+    onContentSaved,
+    onError,
+    onSessionEnded,
+    onSessionJoined,
 }: UseSessionSocketOptions) {
   const updateContent = useCallback(
     (content: string) => {
-      if (!ownerToken) return;
-      socketService.updateContent({
-        slug,
-        content,
-        ownerToken,
-      });
+      if (ownerToken) {
+        socketService.updateContent({ slug, content, ownerToken });
+      } else {
+        socketService.updateContent({ slug, content, deviceId });
+      }
     },
-    [slug, ownerToken],
+    [slug, ownerToken, deviceId],
   );
 
   useEffect(() => {
@@ -82,6 +85,18 @@ export function useSessionSocket({
       onError(data.message);
     });
 
+    const unsub6 = socketService.onPermissionsChanged((data) => {
+      if (data.slug === slug) {
+        onPermissionsChanged?.(data.permission, data.deviceLimit);
+      }
+    });
+
+    const unsub7 = socketService.onSessionEnded((data) => {
+      if (data.slug === slug) {
+        onSessionEnded?.();
+      }
+    });
+
     socketService.joinSession({
       slug,
       deviceId,
@@ -95,6 +110,8 @@ export function useSessionSocket({
       unsub3();
       unsub4();
       unsub5();
+      unsub6();
+      unsub7();
       socketService.leaveSession({ slug, deviceId });
     };
   }, [slug, deviceId, ownerToken, password, enabled]);

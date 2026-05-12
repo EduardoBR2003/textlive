@@ -7,4 +7,8 @@ export class JoinSessionDto {
 
   @IsString()
   deviceId: string;
+
+  @IsOptional()
+  @IsString()
+  ownerToken?: string;
 }

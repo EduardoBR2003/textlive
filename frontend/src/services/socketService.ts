@@ -22,6 +22,12 @@ export interface ContentSavedEvent {
   updatedAt: string;
 }
 
+export interface PermissionsChangedEvent {
+  slug: string;
+  permission: SessionPermission;
+  deviceLimit: number;
+}
+
 export interface DeviceCountChangedEvent {
   slug: string;
   count: number;
@@ -84,7 +90,8 @@ class SocketService {
   updateContent(data: {
     slug: string;
     content: string;
-    ownerToken: string;
+    ownerToken?: string;
+    deviceId?: string;
   }): void {
     this.socket?.emit('update-content', data);
   }
@@ -115,6 +122,13 @@ class SocketService {
     return () => this.socket?.off('device-count-changed', callback);
   }
 
+  onPermissionsChanged(
+    callback: (data: PermissionsChangedEvent) => void,
+  ): () => void {
+    this.socket?.on('permissions-changed', callback);
+    return () => this.socket?.off('permissions-changed', callback);
+  }
+
   onSessionState(callback: (data: SessionStateEvent) => void): () => void {
     this.socket?.on('session-state', callback);
     return () => this.socket?.off('session-state', callback);
@@ -130,6 +144,11 @@ class SocketService {
   onError(callback: (data: ErrorEvent) => void): () => void {
     this.socket?.on('error', callback);
     return () => this.socket?.off('error', callback);
+  }
+
+  onSessionEnded(callback: (data: { slug: string }) => void): () => void {
+    this.socket?.on('session-ended', callback);
+    return () => this.socket?.off('session-ended', callback);
   }
 }
 

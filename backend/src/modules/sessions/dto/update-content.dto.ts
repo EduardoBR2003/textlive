@@ -1,9 +1,14 @@
-import { IsString } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class UpdateContentDto {
   @IsString()
   content: string;
 
+  @IsOptional()
   @IsString()
-  ownerToken: string;
+  ownerToken?: string;
+
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
 }
